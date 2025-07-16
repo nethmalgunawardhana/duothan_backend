@@ -29,5 +29,9 @@ router.delete('/challenges/:id', adminAuthMiddleware, adminController.deleteChal
 
 // Submission management
 router.get('/submissions', adminAuthMiddleware, adminController.getAllSubmissions);
+router.get('/submissions/:id', adminAuthMiddleware, adminController.getSubmissionById);
+
+// Code execution for testing
+router.post('/execute', adminAuthMiddleware, adminController.executeCode);
 
 module.exports = router; 

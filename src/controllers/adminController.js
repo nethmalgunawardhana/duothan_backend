@@ -306,22 +306,23 @@ const getAllSubmissions = async (req, res) => {
   try {
     const { Submission } = require('../models');
     const { db } = require('../config/firebase');
-    const { challengeId } = req.query;
+    const { challengeId, teamId, limit = 100 } = req.query;
     
-    let submissions;
+    let query = db.collection('submissions').orderBy('submittedAt', 'desc');
+    
     if (challengeId) {
-      submissions = await Submission.getByChallengeId(challengeId);
-    } else {
-      // Get all submissions (limited to avoid large responses)
-      const snapshot = await db.collection('submissions')
-        .orderBy('submittedAt', 'desc')
-        .limit(100)
-        .get();
-      
-      submissions = snapshot.docs.map(doc => 
-        new Submission({ id: doc.id, ...doc.data() })
-      );
+      query = query.where('challengeId', '==', challengeId);
     }
+    
+    if (teamId) {
+      query = query.where('teamId', '==', teamId);
+    }
+    
+    const snapshot = await query.limit(parseInt(limit)).get();
+    
+    const submissions = snapshot.docs.map(doc => 
+      new Submission({ id: doc.id, ...doc.data() })
+    );
     
     res.json({
       success: true,
@@ -332,6 +333,33 @@ const getAllSubmissions = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get submissions'
+    });
+  }
+};
+
+// Get submission details by ID (admin only)
+const getSubmissionById = async (req, res) => {
+  try {
+    const { Submission } = require('../models');
+    const { id } = req.params;
+    
+    const submission = await Submission.findById(id);
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: 'Submission not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      submission
+    });
+  } catch (error) {
+    console.error('Get submission by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get submission'
     });
   }
 };
@@ -422,8 +450,46 @@ const logout = (req, res) => {
   });
 };
 
+// Execute code for testing (admin only)
+const executeCode = async (req, res) => {
+  try {
+    const { executeCode } = require('../utils/judge0Service');
+    const { code, language, stdin } = req.body;
+    
+    // Validate input
+    if (!code || !language) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: code or language'
+      });
+    }
+    
+    // Execute code
+    const startTime = Date.now();
+    const executionResult = await executeCode(code, language, stdin || '');
+    const executionTime = Date.now() - startTime;
+    
+    res.json({
+      success: true,
+      message: 'Code executed successfully',
+      result: {
+        executionResult,
+        executionTime
+      }
+    });
+  } catch (error) {
+    console.error('Admin code execution error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Code execution failed',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   login,
+  logout,
   getProfile,
   updateProfile,
   getAllTeams,
@@ -434,7 +500,8 @@ module.exports = {
   updateChallenge,
   deleteChallenge,
   getAllSubmissions,
+  getSubmissionById,
   getSubmissionsByTeam,
   getDashboardStats,
-  logout
+  executeCode
 }; 
