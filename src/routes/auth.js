@@ -17,4 +17,8 @@ router.post('/team/login/password', authController.loginTeam);
 router.get('/team/profile', authMiddleware, authController.getTeamProfile);
 router.put('/team/profile', authMiddleware, authController.updateTeamProfile);
 
+// Team challenges (public access to active challenges)
+router.get('/challenges', authController.getActiveChallenges);
+router.get('/challenges/:id', authController.getChallengeById);
+
 module.exports = router;

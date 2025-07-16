@@ -407,6 +407,62 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// Get active challenges for teams
+const getActiveChallenges = async (req, res) => {
+  try {
+    const Challenge = require('../models/Challenge');
+    const challenges = await Challenge.findAll({
+      where: { isActive: true },
+      order: [['createdAt', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      data: challenges
+    });
+  } catch (error) {
+    console.error('Get challenges error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch challenges'
+    });
+  }
+};
+
+// Get challenge by ID for teams
+const getChallengeById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const Challenge = require('../models/Challenge');
+    
+    const challenge = await Challenge.findById(id);
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Challenge not found'
+      });
+    }
+
+    if (!challenge.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Challenge is not active'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: challenge
+    });
+  } catch (error) {
+    console.error('Get challenge error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch challenge'
+    });
+  }
+};
+
 module.exports = {
   // Legacy user methods
   register,
@@ -419,5 +475,9 @@ module.exports = {
   loginTeam,
   loginTeamOAuth,
   getTeamProfile,
-  updateTeamProfile
+  updateTeamProfile,
+  
+  // Team challenges
+  getActiveChallenges,
+  getChallengeById
 };
