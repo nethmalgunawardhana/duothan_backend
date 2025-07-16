@@ -411,20 +411,21 @@ const updateProfile = async (req, res) => {
 const getActiveChallenges = async (req, res) => {
   try {
     const Challenge = require('../models/Challenge');
-    const challenges = await Challenge.findAll({
-      where: { isActive: true },
-      order: [['createdAt', 'ASC']]
-    });
+    console.log('Fetching active challenges...');
+    
+    const challenges = await Challenge.getActive();
+    console.log('Found challenges:', challenges.length);
 
     res.json({
       success: true,
-      data: challenges
+      data: challenges || []
     });
   } catch (error) {
     console.error('Get challenges error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch challenges'
+      message: 'Failed to fetch challenges',
+      error: error.message
     });
   }
 };

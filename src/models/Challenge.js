@@ -95,14 +95,27 @@ class Challenge {
   // Get active challenges
   static async getActive() {
     try {
-      const snapshot = await db.collection('challenges')
-        .where('isActive', '==', true)
-        .orderBy('order', 'asc')
-        .get();
+      // First try with ordering
+      let snapshot;
+      try {
+        snapshot = await db.collection('challenges')
+          .where('isActive', '==', true)
+          .orderBy('order', 'asc')
+          .get();
+      } catch (orderError) {
+        // If ordering fails (likely due to missing index), get without ordering
+        console.warn('Ordering by order field failed, fetching without ordering:', orderError.message);
+        snapshot = await db.collection('challenges')
+          .where('isActive', '==', true)
+          .get();
+      }
       
-      return snapshot.docs.map(doc => 
+      const challenges = snapshot.docs.map(doc => 
         new Challenge({ id: doc.id, ...doc.data() })
       );
+      
+      // Sort in memory if we couldn't order in the query
+      return challenges.sort((a, b) => (a.order || 1) - (b.order || 1));
     } catch (error) {
       throw new Error('Error getting active challenges: ' + error.message);
     }
