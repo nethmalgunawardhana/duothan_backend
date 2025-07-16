@@ -91,10 +91,9 @@ FROM_EMAIL=your-verified-sender@example.com
 DEFAULT_ADMIN_EMAIL=admin@oasis.com
 DEFAULT_ADMIN_PASSWORD=admin123
 
-# Judge0 API Configuration
-JUDGE0_API_URL=https://judge0-ce.p.rapidapi.com
-JUDGE0_API_KEY=your-rapidapi-key
-JUDGE0_API_HOST=judge0-ce.p.rapidapi.com
+# Judge0 API Configuration (Custom CE Instance)
+JUDGE0_API_URL=http://10.3.5.139:2358
+JUDGE0_API_TOKEN=ZHVvdGhhbjUuMA==
 ```
 
 ## 📁 Project Structure

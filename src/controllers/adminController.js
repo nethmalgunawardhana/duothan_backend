@@ -183,6 +183,150 @@ const getTeamById = async (req, res) => {
   }
 };
 
+const createTeam = async (req, res) => {
+  try {
+    const { teamName, email, password } = req.body;
+
+    if (!teamName || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Team name, email, and password are required'
+      });
+    }
+
+    const { Team } = require('../models');
+    
+    // Check if team with email already exists
+    const existingTeam = await Team.findByEmail(email);
+    if (existingTeam) {
+      return res.status(400).json({
+        success: false,
+        message: 'Team with this email already exists'
+      });
+    }
+
+    // Check if team with name already exists
+    const existingTeamName = await Team.findByTeamName(teamName);
+    if (existingTeamName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Team with this name already exists'
+      });
+    }
+
+    const team = await Team.create({
+      teamName,
+      email,
+      password,
+      authProvider: null,
+      providerData: null
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Team created successfully',
+      data: team.toJSON()
+    });
+  } catch (error) {
+    console.error('Create team error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create team',
+      error: error.message
+    });
+  }
+};
+
+const updateTeam = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { teamName, email, isActive, points } = req.body;
+
+    const { Team } = require('../models');
+    const team = await Team.findById(id);
+    
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found'
+      });
+    }
+
+    // Check if email is being changed and if new email already exists
+    if (email && email !== team.email) {
+      const existingTeam = await Team.findByEmail(email);
+      if (existingTeam) {
+        return res.status(400).json({
+          success: false,
+          message: 'Team with this email already exists'
+        });
+      }
+    }
+
+    // Check if team name is being changed and if new name already exists
+    if (teamName && teamName !== team.teamName) {
+      const existingTeamName = await Team.findByTeamName(teamName);
+      if (existingTeamName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Team with this name already exists'
+        });
+      }
+    }
+
+    const updateData = {};
+    if (teamName) updateData.teamName = teamName;
+    if (email) updateData.email = email;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (points !== undefined) updateData.points = points;
+
+    const updatedTeam = await team.update(updateData);
+
+    res.json({
+      success: true,
+      message: 'Team updated successfully',
+      data: updatedTeam.toJSON()
+    });
+  } catch (error) {
+    console.error('Update team error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update team',
+      error: error.message
+    });
+  }
+};
+
+const deleteTeam = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { Team } = require('../models');
+    const team = await Team.findById(id);
+    
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found'
+      });
+    }
+
+    await team.delete();
+
+    res.json({
+      success: true,
+      message: 'Team deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete team error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete team',
+      error: error.message
+    });
+  }
+};
+
 const getAllChallenges = async (req, res) => {
   try {
     const { Challenge } = require('../models');
@@ -594,6 +738,80 @@ const executeCode = async (req, res) => {
   }
 };
 
+const getTeamDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { Team } = require('../models');
+    const { db } = require('../config/firebase');
+    
+    const team = await Team.findById(id);
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found'
+      });
+    }
+
+    // Get team submissions
+    const submissionsSnapshot = await db.collection('submissions')
+      .where('teamId', '==', id)
+      .orderBy('submittedAt', 'desc')
+      .limit(20)
+      .get();
+
+    const submissions = [];
+    for (const doc of submissionsSnapshot.docs) {
+      const submissionData = doc.data();
+      
+      // Get challenge details
+      const challengeDoc = await db.collection('challenges').doc(submissionData.challengeId).get();
+      const challengeData = challengeDoc.exists ? challengeDoc.data() : null;
+      
+      submissions.push({
+        id: doc.id,
+        challengeId: submissionData.challengeId,
+        challengeTitle: challengeData ? challengeData.title : 'Unknown Challenge',
+        status: submissionData.status,
+        points: submissionData.points || 0,
+        submittedAt: submissionData.submittedAt
+      });
+    }
+
+    // Calculate team rank
+    const allTeamsSnapshot = await db.collection('teams')
+      .orderBy('points', 'desc')
+      .get();
+    
+    let rank = 1;
+    for (const doc of allTeamsSnapshot.docs) {
+      if (doc.id === id) break;
+      rank++;
+    }
+
+    // Get last activity (most recent submission)
+    const lastSubmission = submissions.length > 0 ? submissions[0].submittedAt : team.createdAt;
+
+    const teamDetails = {
+      ...team.toJSON(),
+      submissions,
+      rank,
+      lastActivity: lastSubmission
+    };
+
+    res.json({
+      success: true,
+      data: teamDetails
+    });
+  } catch (error) {
+    console.error('Get team details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get team details',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   login,
   logout,
@@ -601,6 +819,10 @@ module.exports = {
   updateProfile,
   getAllTeams,
   getTeamById,
+  getTeamDetails,
+  createTeam,
+  updateTeam,
+  deleteTeam,
   getAllChallenges,
   getChallengeById,
   createChallenge,

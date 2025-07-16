@@ -18,6 +18,10 @@ router.get('/dashboard/stats', adminAuthMiddleware, adminController.getDashboard
 // Team management
 router.get('/teams', adminAuthMiddleware, adminController.getAllTeams);
 router.get('/teams/:id', adminAuthMiddleware, adminController.getTeamById);
+router.get('/teams/:id/details', adminAuthMiddleware, adminController.getTeamDetails);
+router.post('/teams', adminAuthMiddleware, adminController.createTeam);
+router.put('/teams/:id', adminAuthMiddleware, adminController.updateTeam);
+router.delete('/teams/:id', adminAuthMiddleware, adminController.deleteTeam);
 router.get('/teams/:teamId/submissions', adminAuthMiddleware, adminController.getSubmissionsByTeam);
 
 // Challenge management

@@ -17,11 +17,12 @@ const submitCode = async (sourceCode, language, stdin = '', options = {}) => {
       throw new Error(`Unsupported language: ${language}`);
     }
 
-    // Prepare submission data
+    // Prepare submission data (Judge0 CE format)
     const submissionData = {
-      source_code: Buffer.from(sourceCode).toString('base64'),
+      source_code: sourceCode,
       language_id: languageId,
-      stdin: stdin ? Buffer.from(stdin).toString('base64') : '',
+      stdin: stdin || '',
+      wait: false,
       ...options
     };
 
@@ -49,27 +50,10 @@ const submitCode = async (sourceCode, language, stdin = '', options = {}) => {
  */
 const getSubmissionResult = async (token) => {
   try {
-    const response = await judge0Api.get(`/submissions/${token}?base64_encoded=true&fields=status_id,status,stdout,stderr,compile_output,message,time,memory,exit_code,token,number_of_runs,cpu_time_limit,cpu_extra_time,wall_time_limit,memory_limit,language_id,source_code,stdin`);
+    const response = await judge0Api.get(`/submissions/${token}?fields=status_id,status,stdout,stderr,compile_output,message,time,memory,exit_code,token`);
     
     const result = response.data;
     
-    // Decode base64 outputs
-    if (result.stdout) {
-      result.stdout = Buffer.from(result.stdout, 'base64').toString();
-    }
-    
-    if (result.stderr) {
-      result.stderr = Buffer.from(result.stderr, 'base64').toString();
-    }
-    
-    if (result.compile_output) {
-      result.compile_output = Buffer.from(result.compile_output, 'base64').toString();
-    }
-    
-    if (result.message) {
-      result.message = Buffer.from(result.message, 'base64').toString();
-    }
-
     return {
       status: result.status.id,
       statusDescription: result.status.description,
