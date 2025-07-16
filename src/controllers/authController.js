@@ -1,8 +1,10 @@
-// src/controllers/authController.js (Updated to use User model)
+// src/controllers/authController.js
 const { generateToken } = require('../utils/jwt');
 const { sendEmail } = require('../config/sendgrid');
 const User = require('../models/User');
+const Team = require('../models/Team');
 
+// User authentication (legacy)
 const register = async (req, res) => {
   try {
     const { email, password, name } = req.body;
@@ -95,6 +97,196 @@ const login = async (req, res) => {
   }
 };
 
+// Team authentication (new)
+const registerTeam = async (req, res) => {
+  try {
+    const { email, password, teamName, authProvider, providerData } = req.body;
+
+    // Check if team exists with same email
+    const existingTeamByEmail = await Team.findByEmail(email);
+    if (existingTeamByEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Team with this email already exists'
+      });
+    }
+
+    // Check if team exists with same name
+    const existingTeamByName = await Team.findByTeamName(teamName);
+    if (existingTeamByName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Team name already taken'
+      });
+    }
+
+    // Create team
+    const team = await Team.create({ 
+      teamName, 
+      email, 
+      password, 
+      authProvider, 
+      providerData 
+    });
+    
+    const token = generateToken({ 
+      id: team.id, 
+      email: team.email,
+      teamName: team.teamName,
+      type: 'team'
+    });
+
+    // Send welcome email
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Welcome to Duothan!',
+        html: `<h1>Welcome ${teamName}!</h1><p>Your team has been registered successfully.</p>`
+      });
+    } catch (emailError) {
+      console.warn('Email sending failed:', emailError.message);
+      // Don't fail registration if email fails
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Team registered successfully',
+      token,
+      team: team.toJSON() // Returns team without password
+    });
+  } catch (error) {
+    console.error('Team register error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Team registration failed'
+    });
+  }
+};
+
+const loginTeam = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find team
+    const team = await Team.findByEmail(email);
+    if (!team) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check password
+    const isValidPassword = await team.verifyPassword(password);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    const token = generateToken({
+      id: team.id,
+      email: team.email,
+      teamName: team.teamName,
+      type: 'team'
+    });
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      token,
+      team: team.toJSON()
+    });
+  } catch (error) {
+    console.error('Team login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Team login failed'
+    });
+  }
+};
+
+const getTeamProfile = async (req, res) => {
+  try {
+    // Check if the user is a team
+    if (req.user.type !== 'team') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Not a team account.'
+      });
+    }
+
+    const team = await Team.findById(req.user.id);
+    
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      team: team.toJSON()
+    });
+  } catch (error) {
+    console.error('Get team profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get team profile'
+    });
+  }
+};
+
+const updateTeamProfile = async (req, res) => {
+  try {
+    // Check if the user is a team
+    if (req.user.type !== 'team') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Not a team account.'
+      });
+    }
+    
+    const { teamName } = req.body;
+    
+    // If changing team name, check if it's already taken
+    if (teamName) {
+      const existingTeam = await Team.findByTeamName(teamName);
+      if (existingTeam && existingTeam.id !== req.user.id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Team name already taken'
+        });
+      }
+    }
+    
+    const team = await Team.findById(req.user.id);
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found'
+      });
+    }
+
+    const updatedTeam = await team.update(req.body);
+
+    res.json({
+      success: true,
+      message: 'Team profile updated successfully',
+      team: updatedTeam.toJSON()
+    });
+  } catch (error) {
+    console.error('Update team profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update team profile'
+    });
+  }
+};
+
+// Legacy user profile methods
 const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -148,8 +340,15 @@ const updateProfile = async (req, res) => {
 };
 
 module.exports = {
+  // Legacy user methods
   register,
   login,
   getProfile,
-  updateProfile
+  updateProfile,
+  
+  // Team methods
+  registerTeam,
+  loginTeam,
+  getTeamProfile,
+  updateTeamProfile
 };
