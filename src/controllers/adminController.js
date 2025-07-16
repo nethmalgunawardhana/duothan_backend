@@ -149,6 +149,33 @@ const getAllTeams = async (req, res) => {
   }
 };
 
+// Get team by ID (admin only)
+const getTeamById = async (req, res) => {
+  try {
+    const { Team } = require('../models');
+    const { id } = req.params;
+    
+    const team = await Team.findById(id);
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      team: team.toJSON()
+    });
+  } catch (error) {
+    console.error('Get team by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get team'
+    });
+  }
+};
+
 // Get all challenges (admin only)
 const getAllChallenges = async (req, res) => {
   try {
@@ -164,6 +191,33 @@ const getAllChallenges = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get challenges'
+    });
+  }
+};
+
+// Get a challenge by ID (admin only)
+const getChallengeById = async (req, res) => {
+  try {
+    const { Challenge } = require('../models');
+    const { id } = req.params;
+    
+    const challenge = await Challenge.findById(id);
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Challenge not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      challenge
+    });
+  } catch (error) {
+    console.error('Get challenge by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get challenge'
     });
   }
 };
@@ -218,6 +272,35 @@ const updateChallenge = async (req, res) => {
   }
 };
 
+// Delete a challenge (admin only)
+const deleteChallenge = async (req, res) => {
+  try {
+    const { Challenge } = require('../models');
+    const { id } = req.params;
+    
+    const challenge = await Challenge.findById(id);
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Challenge not found'
+      });
+    }
+    
+    await challenge.delete();
+    
+    res.json({
+      success: true,
+      message: 'Challenge deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete challenge error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete challenge'
+    });
+  }
+};
+
 // Get all submissions (admin only)
 const getAllSubmissions = async (req, res) => {
   try {
@@ -253,13 +336,105 @@ const getAllSubmissions = async (req, res) => {
   }
 };
 
+// Get submissions by team ID (admin only)
+const getSubmissionsByTeam = async (req, res) => {
+  try {
+    const { Submission } = require('../models');
+    const { teamId } = req.params;
+    
+    const submissions = await Submission.getByTeamId(teamId);
+    
+    res.json({
+      success: true,
+      submissions
+    });
+  } catch (error) {
+    console.error('Get submissions by team error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get submissions'
+    });
+  }
+};
+
+// Get dashboard stats for admin
+const getDashboardStats = async (req, res) => {
+  try {
+    const { Team, Challenge, Submission } = require('../models');
+    const { db } = require('../config/firebase');
+    
+    // Get total teams count
+    const teamsSnapshot = await db.collection('teams').get();
+    const totalTeams = teamsSnapshot.size;
+    
+    // Get total challenges count
+    const challengesSnapshot = await db.collection('challenges').get();
+    const totalChallenges = challengesSnapshot.size;
+    
+    // Get total submissions count
+    const submissionsSnapshot = await db.collection('submissions').get();
+    const totalSubmissions = submissionsSnapshot.size;
+    
+    // Get recent submissions
+    const recentSubmissionsSnapshot = await db.collection('submissions')
+      .orderBy('submittedAt', 'desc')
+      .limit(5)
+      .get();
+    
+    const recentSubmissions = recentSubmissionsSnapshot.docs.map(doc => 
+      new Submission({ id: doc.id, ...doc.data() })
+    );
+    
+    // Get top teams by points
+    const topTeamsSnapshot = await db.collection('teams')
+      .orderBy('points', 'desc')
+      .limit(5)
+      .get();
+    
+    const topTeams = topTeamsSnapshot.docs.map(doc => 
+      new Team({ id: doc.id, ...doc.data() }).toJSON()
+    );
+    
+    res.json({
+      success: true,
+      stats: {
+        totalTeams,
+        totalChallenges,
+        totalSubmissions,
+        recentSubmissions,
+        topTeams
+      }
+    });
+  } catch (error) {
+    console.error('Get dashboard stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get dashboard stats'
+    });
+  }
+};
+
+// Logout admin (just for frontend, no backend action needed)
+const logout = (req, res) => {
+  res.json({
+    success: true,
+    message: 'Logged out successfully'
+  });
+};
+
 module.exports = {
   login,
   getProfile,
   updateProfile,
   getAllTeams,
+  getTeamById,
   getAllChallenges,
+  getChallengeById,
   createChallenge,
   updateChallenge,
-  getAllSubmissions
+  deleteChallenge,
+  getAllSubmissions,
+  getSubmissionsByTeam,
+  getDashboardStats,
+  logout
 }; 
