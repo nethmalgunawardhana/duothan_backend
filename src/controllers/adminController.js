@@ -184,13 +184,14 @@ const getAllChallenges = async (req, res) => {
     
     res.json({
       success: true,
-      challenges
+      data: challenges
     });
   } catch (error) {
     console.error('Get all challenges error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get challenges'
+      message: 'Failed to get challenges',
+      error: error.message
     });
   }
 };
@@ -211,13 +212,14 @@ const getChallengeById = async (req, res) => {
     
     res.json({
       success: true,
-      challenge
+      data: challenge
     });
   } catch (error) {
     console.error('Get challenge by ID error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get challenge'
+      message: 'Failed to get challenge',
+      error: error.message
     });
   }
 };
@@ -225,19 +227,51 @@ const getChallengeById = async (req, res) => {
 // Create a challenge (admin only)
 const createChallenge = async (req, res) => {
   try {
+    // Basic validation
+    const { title, description, type, difficulty, points } = req.body;
+    
+    if (!title || !description) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title and description are required'
+      });
+    }
+    
+    if (!['algorithmic', 'buildathon'].includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid challenge type. Must be algorithmic or buildathon'
+      });
+    }
+    
+    if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid difficulty. Must be easy, medium, or hard'
+      });
+    }
+    
+    if (points && (typeof points !== 'number' || points <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Points must be a positive number'
+      });
+    }
+    
     const { Challenge } = require('../models');
     const challenge = await Challenge.create(req.body);
     
     res.status(201).json({
       success: true,
       message: 'Challenge created successfully',
-      challenge
+      data: challenge
     });
   } catch (error) {
     console.error('Create challenge error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create challenge'
+      message: 'Failed to create challenge',
+      error: error.message
     });
   }
 };
@@ -247,6 +281,30 @@ const updateChallenge = async (req, res) => {
   try {
     const { Challenge } = require('../models');
     const { id } = req.params;
+    
+    // Validate if updating type or difficulty
+    const { type, difficulty, points } = req.body;
+    
+    if (type && !['algorithmic', 'buildathon'].includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid challenge type. Must be algorithmic or buildathon'
+      });
+    }
+    
+    if (difficulty && !['easy', 'medium', 'hard'].includes(difficulty)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid difficulty. Must be easy, medium, or hard'
+      });
+    }
+    
+    if (points && (typeof points !== 'number' || points <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Points must be a positive number'
+      });
+    }
     
     const challenge = await Challenge.findById(id);
     if (!challenge) {
@@ -261,13 +319,14 @@ const updateChallenge = async (req, res) => {
     res.json({
       success: true,
       message: 'Challenge updated successfully',
-      challenge: updatedChallenge
+      data: updatedChallenge
     });
   } catch (error) {
     console.error('Update challenge error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update challenge'
+      message: 'Failed to update challenge',
+      error: error.message
     });
   }
 };
@@ -504,4 +563,4 @@ module.exports = {
   getSubmissionsByTeam,
   getDashboardStats,
   executeCode
-}; 
+};

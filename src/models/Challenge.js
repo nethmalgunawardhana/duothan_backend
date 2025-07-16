@@ -7,15 +7,16 @@ class Challenge {
     this.title = data.title;
     this.description = data.description || '';
     this.type = data.type || 'algorithmic'; // 'algorithmic' or 'buildathon'
-    this.algorithmicProblem = data.algorithmicProblem || null;
-    this.buildathonProblem = data.buildathonProblem || null;
-    this.flag = data.flag;
-    this.points = data.points || 100;
     this.difficulty = data.difficulty || 'medium'; // 'easy', 'medium', 'hard'
+    this.points = data.points || 100;
+    this.timeLimit = data.timeLimit || null; // in minutes, null means no limit
+    this.flags = data.flags || []; // Array of strings
+    this.testCases = data.testCases || []; // Array of test case objects
+    this.resources = data.resources || []; // Array of resource objects
     this.isActive = data.isActive !== undefined ? data.isActive : true;
     this.createdAt = data.createdAt || new Date();
+    this.updatedAt = data.updatedAt || new Date();
     this.order = data.order || 1;
-    this.timeLimit = data.timeLimit || null; // in minutes, null means no limit
   }
 
   // Find challenge by ID
@@ -38,15 +39,16 @@ class Challenge {
         title: challengeData.title,
         description: challengeData.description || '',
         type: challengeData.type || 'algorithmic',
-        algorithmicProblem: challengeData.algorithmicProblem || null,
-        buildathonProblem: challengeData.buildathonProblem || null,
-        flag: challengeData.flag,
-        points: challengeData.points || 100,
         difficulty: challengeData.difficulty || 'medium',
+        points: challengeData.points || 100,
+        timeLimit: challengeData.timeLimit || null,
+        flags: challengeData.flags || [],
+        testCases: challengeData.testCases || [],
+        resources: challengeData.resources || [],
         isActive: challengeData.isActive !== undefined ? challengeData.isActive : true,
         createdAt: new Date(),
-        order: challengeData.order || 1,
-        timeLimit: challengeData.timeLimit || null
+        updatedAt: new Date(),
+        order: challengeData.order || 1
       };
 
       const challengeRef = await db.collection('challenges').add(newChallenge);
@@ -59,10 +61,15 @@ class Challenge {
   // Update challenge
   async update(updateData) {
     try {
-      await db.collection('challenges').doc(this.id).update(updateData);
+      const dataToUpdate = {
+        ...updateData,
+        updatedAt: new Date()
+      };
+      
+      await db.collection('challenges').doc(this.id).update(dataToUpdate);
       
       // Update current instance
-      Object.assign(this, updateData);
+      Object.assign(this, dataToUpdate);
       return this;
     } catch (error) {
       throw new Error('Error updating challenge: ' + error.message);
@@ -125,11 +132,6 @@ class Challenge {
     } catch (error) {
       throw new Error('Error deleting challenge: ' + error.message);
     }
-  }
-
-  // Verify flag
-  verifyFlag(submittedFlag) {
-    return this.flag === submittedFlag;
   }
 }
 
