@@ -1,6 +1,7 @@
 const { testFirebaseConnection } = require('../config/firebase');
 const { testSendGridConnection } = require('../config/sendgrid');
 const { testImageKitConnection } = require('../config/imagekit');
+const { testJudge0Connection } = require('../config/judge0');
 
 const healthCheck = async (req, res) => {
   const health = {
@@ -20,6 +21,9 @@ const healthCheck = async (req, res) => {
     
     // Test ImageKit
     health.services.imagekit = await testImageKitConnection();
+    
+    // Test Judge0
+    health.services.judge0 = await testJudge0Connection();
     
     const allServicesHealthy = Object.values(health.services).every(status => status === true);
     
@@ -64,7 +68,8 @@ const servicesCheck = async (req, res) => {
     const services = {
       firebase: await testFirebaseConnection(),
       imagekit: await testImageKitConnection(),
-      sendgrid: !!process.env.SENDGRID_API_KEY
+      sendgrid: !!process.env.SENDGRID_API_KEY,
+      judge0: await testJudge0Connection()
     };
 
     res.json({
