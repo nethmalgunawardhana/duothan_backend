@@ -151,14 +151,80 @@ const registerTeam = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Team registered successfully',
-      token,
-      team: team.toJSON() // Returns team without password
+      data: {
+        token,
+        team: team.toJSON() // Returns team without password
+      }
     });
   } catch (error) {
     console.error('Team register error:', error);
     res.status(500).json({
       success: false,
       message: 'Team registration failed'
+    });
+  }
+};
+
+// OAuth-style team login (for GitHub/Google)
+const loginTeamOAuth = async (req, res) => {
+  try {
+    const { email, authProvider, providerData } = req.body;
+
+    if (!email || !authProvider || !providerData) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required OAuth parameters'
+      });
+    }
+
+    // Find team by email
+    let team = await Team.findByEmail(email);
+    
+    if (!team) {
+      // Auto-register team if not found (OAuth flow)
+      const teamName = providerData.name || providerData.login || email.split('@')[0];
+      
+      try {
+        team = await Team.create({ 
+          teamName: teamName + '_' + Date.now(), // Ensure unique team name
+          email, 
+          authProvider, 
+          providerData,
+          // No password needed for OAuth
+          password: null
+        });
+      } catch (createError) {
+        console.error('Auto-registration failed:', createError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to create team account'
+        });
+      }
+    } else {
+      // Update provider data for existing team
+      await team.update({ providerData, authProvider });
+    }
+
+    const token = generateToken({
+      id: team.id,
+      email: team.email,
+      teamName: team.teamName,
+      type: 'team'
+    });
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
+        team: team.toJSON()
+      }
+    });
+  } catch (error) {
+    console.error('OAuth team login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'OAuth login failed'
     });
   }
 };
@@ -195,8 +261,10 @@ const loginTeam = async (req, res) => {
     res.json({
       success: true,
       message: 'Login successful',
-      token,
-      team: team.toJSON()
+      data: {
+        token,
+        team: team.toJSON()
+      }
     });
   } catch (error) {
     console.error('Team login error:', error);
@@ -349,6 +417,7 @@ module.exports = {
   // Team methods
   registerTeam,
   loginTeam,
+  loginTeamOAuth,
   getTeamProfile,
   updateTeamProfile
 };
